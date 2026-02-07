@@ -34,7 +34,11 @@ yarn-error.*
 
 # local env files
 .env*.local
+
+
+# Ignore specific files
 firebase.js
+
 
 
 # typescript

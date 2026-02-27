@@ -17,7 +17,7 @@ Backend Repo: https://github.com/TheLunatic1/RNT-backend.git
 </table>
 
 <!-- Optional caption below -->
-<p align="center"><em>App in action: List view, Chart view, Add modal, Dark mode</em></p>
+<p align="center"><em>App in action: List view, Chart view, login, sign up</em></p>
 
 ## Features
 

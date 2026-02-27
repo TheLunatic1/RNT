@@ -5,6 +5,20 @@ MERN-stack developer friendly — no native modules, pure JS + raw styles.
 
 Backend Repo: https://github.com/TheLunatic1/RNT-backend.git
 
+### Screenshots
+
+<table>
+  <tr>
+    <td><img src="https://github.com/TheLunatic1/RNT/raw/main/preview.jpg" alt="Screenshot 1" width="200"/></td>
+    <td><img src="https://github.com/TheLunatic1/RNT/raw/main/preview1.jpg" alt="Screenshot 2" width="200"/></td>
+    <td><img src="https://github.com/TheLunatic1/RNT/raw/main/preview2.jpg" alt="Screenshot 3" width="200"/></td>
+    <td><img src="https://github.com/TheLunatic1/RNT/raw/main/preview3.jpg" alt="Screenshot 4" width="200"/></td>
+  </tr>
+</table>
+
+<!-- Optional caption below -->
+<p align="center"><em>App in action: List view, Chart view, Add modal, Dark mode</em></p>
+
 ## Features
 
 - **User Authentication** (JWT)

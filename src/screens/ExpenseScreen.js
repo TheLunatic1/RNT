@@ -14,6 +14,7 @@ import AddExpenseModal from '../components/AddExpenseModal';
 import ChartTab from './ChartTab';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
+import { API_BASE_URL } from '../constants/api'; // Make sure this file exists (see below)
 
 export default function ExpenseScreen() {
   const { token, logout } = useContext(AuthContext);
@@ -36,7 +37,7 @@ export default function ExpenseScreen() {
     setError(null);
 
     try {
-      const response = await fetch('http://192.168.0.104:5000/api/expenses', {
+      const response = await fetch(`${API_BASE_URL}/api/expenses`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -67,7 +68,7 @@ export default function ExpenseScreen() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch('http://192.168.0.104:5000/api/categories', {
+      const response = await fetch(`${API_BASE_URL}/api/categories`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -100,7 +101,7 @@ export default function ExpenseScreen() {
     }
 
     try {
-      const response = await fetch('http://192.168.0.104:5000/api/categories', {
+      const response = await fetch(`${API_BASE_URL}/api/categories`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -136,7 +137,7 @@ export default function ExpenseScreen() {
       setExpenses(optimisticExpenses);
 
       try {
-        const response = await fetch(`http://192.168.0.104:5000/api/expenses/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/expenses/${id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -178,7 +179,7 @@ export default function ExpenseScreen() {
       setExpenses((prev) => [optimisticExpense, ...prev]);
 
       try {
-        const response = await fetch('http://192.168.0.104:5000/api/expenses', {
+        const response = await fetch(`${API_BASE_URL}/api/expenses`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -226,7 +227,7 @@ export default function ExpenseScreen() {
             setExpenses((prev) => prev.filter((exp) => exp._id !== id));
 
             try {
-              const response = await fetch(`http://192.168.0.104:5000/api/expenses/${id}`, {
+              const response = await fetch(`${API_BASE_URL}/api/expenses/${id}`, {
                 method: 'DELETE',
                 headers: { 'x-auth-token': token },
               });

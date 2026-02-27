@@ -6,7 +6,7 @@ export const ThemeContext = createContext();
 export const ThemeProvider = ({ children }) => {
   const [isDark, setIsDark] = useState(false);
 
-  // Load saved preference
+  // Load saved preference on mount
   useEffect(() => {
     const load = async () => {
       try {
@@ -14,7 +14,9 @@ export const ThemeProvider = ({ children }) => {
         if (saved !== null) {
           setIsDark(JSON.parse(saved));
         }
-      } catch (e) {}
+      } catch (e) {
+        console.log('Failed to load theme preference', e);
+      }
     };
     load();
   }, []);
@@ -24,7 +26,9 @@ export const ThemeProvider = ({ children }) => {
     setIsDark(newValue);
     try {
       await AsyncStorage.setItem('isDark', JSON.stringify(newValue));
-    } catch (e) {}
+    } catch (e) {
+      console.log('Failed to save theme mode', e);
+    }
   };
 
   const theme = {

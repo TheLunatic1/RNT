@@ -1,7 +1,7 @@
 # Expense Tracker – React Native (Expo)
 
 Personal Expense Tracker mobile app built with **React Native** + **Expo** (managed workflow).  
-MERN-stack developer friendly — no native modules, pure JS + raw styles.
+No native modules, pure JS + raw styles.
 
 Backend Repo: https://github.com/TheLunatic1/RNT-backend.git
 

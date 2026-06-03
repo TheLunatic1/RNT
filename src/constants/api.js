@@ -1,1 +1,1 @@
-export const API_BASE_URL = 'https://rnt-backend.vercel.app';
+export const API_BASE_URL = 'http://10.0.30.254:5000';

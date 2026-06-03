@@ -9,6 +9,7 @@ import { AuthProvider, AuthContext } from './src/context/AuthContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import ExpenseScreen from './src/screens/ExpenseScreen';
 import AuthScreen from './src/screens/AuthScreen';
+import ErrorBoundary from './src/components/ErrorBoundary';
 
 function MainApp() {
   const { user, loading } = useContext(AuthContext);
@@ -29,7 +30,9 @@ export default function App() {
     <SafeAreaProvider>
       <AuthProvider>
         <ThemeProvider>
-          <MainApp />
+          <ErrorBoundary>
+            <MainApp />
+          </ErrorBoundary>
         </ThemeProvider>
       </AuthProvider>
     </SafeAreaProvider>

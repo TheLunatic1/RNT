@@ -58,21 +58,54 @@ export default function AddExpenseModal({
   }, [visible, initialData, categories]);
 
   const handleSubmit = () => {
-    if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0');
+    // Amount validation
+    if (!amount) {
+      Alert.alert('Invalid Amount', 'Please enter an amount');
       return;
     }
-    if (!description.trim()) {
+    
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum)) {
+      Alert.alert('Invalid Amount', 'Please enter a valid number');
+      return;
+    }
+    
+    if (amountNum <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter an amount greater than 0');
+      return;
+    }
+    
+    // Check for excessively large amounts
+    if (amountNum > 1000000) {
+      Alert.alert('Invalid Amount', 'Amount seems too large. Please check the value.');
+      return;
+    }
+
+    // Description validation
+    if (!description || !description.trim()) {
       Alert.alert('Required', 'Description is required');
       return;
     }
+    
+    // Check description length
+    if (description.trim().length < 3) {
+      Alert.alert('Invalid Description', 'Description must be at least 3 characters long');
+      return;
+    }
+    
+    if (description.trim().length > 200) {
+      Alert.alert('Invalid Description', 'Description is too long (max 200 characters)');
+      return;
+    }
+
+    // Category validation
     if (!category) {
       Alert.alert('Required', 'Please select a category');
       return;
     }
 
     onSave({
-      amount: parseFloat(amount),
+      amount: amountNum,
       description: description.trim(),
       category,
       date: initialData ? initialData.date : new Date().toISOString().split('T')[0],

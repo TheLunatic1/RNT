@@ -22,8 +22,22 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
+    // Basic field validation
     if (!email || !password) {
       Alert.alert('Missing fields', 'Email and password are required');
+      return;
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert('Invalid email', 'Please enter a valid email address');
+      return;
+    }
+
+    // Password validation
+    if (password.length < 6) {
+      Alert.alert('Weak password', 'Password must be at least 6 characters long');
       return;
     }
 
@@ -33,11 +47,20 @@ export default function AuthScreen() {
     if (isLogin) {
       result = await login(email, password);
     } else {
+      // Name validation
       if (!name.trim()) {
         Alert.alert('Missing field', 'Name is required for signup');
         setLoading(false);
         return;
       }
+      
+      // Name length validation
+      if (name.trim().length < 2) {
+        Alert.alert('Invalid name', 'Name must be at least 2 characters long');
+        setLoading(false);
+        return;
+      }
+      
       result = await register(name.trim(), email, password);
     }
 

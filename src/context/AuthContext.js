@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
+import { Alert } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { API_BASE_URL } from '../constants/api';  // ← NEW IMPORT
+import { makeApiRequest } from '../utils/apiService';
 
 export const AuthContext = createContext();
 
@@ -25,21 +26,22 @@ export const AuthProvider = ({ children }) => {
     loadUser();
   }, []);
 
-  const login = async (email, password) => {
+   const login = async (email, password) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      const response = await makeApiRequest({
+        endpoint: '/api/auth/login',
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        data: { email, password },
+        isCritical: true // Authentication requests are critical
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.msg || 'Login failed');
+      // Handle queued request (though we wouldn't queue critical requests)
+      if (response && response.queued) {
+        Alert.alert('Authentication Failed', 'Unable to authenticate while offline. Please connect to internet and try again.');
+        return { success: false, error: 'Unable to authenticate while offline' };
       }
 
-      const { token } = data;
+      const { token } = response;
       await SecureStore.setItemAsync('userToken', token);
       setUser({ token });
       return { success: true };
@@ -49,21 +51,22 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (name, email, password) => {
+   const register = async (name, email, password) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+      const response = await makeApiRequest({
+        endpoint: '/api/auth/register',
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
+        data: { name, email, password },
+        isCritical: true // Authentication requests are critical
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.msg || 'Registration failed');
+      // Handle queued request (though we wouldn't queue critical requests)
+      if (response && response.queued) {
+        Alert.alert('Registration Failed', 'Unable to register while offline. Please connect to internet and try again.');
+        return { success: false, error: 'Unable to register while offline' };
       }
 
-      const { token } = data;
+      const { token } = response;
       await SecureStore.setItemAsync('userToken', token);
       setUser({ token });
       return { success: true };

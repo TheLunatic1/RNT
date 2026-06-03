@@ -9,12 +9,15 @@ import {
   Alert,
   RefreshControl,
   ScrollView,
+  AppState,
 } from 'react-native';
 import AddExpenseModal from '../components/AddExpenseModal';
 import ChartTab from './ChartTab';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { API_BASE_URL } from '../constants/api'; // Make sure this file exists (see below)
+import { makeApiRequest, setupNetworkListener, cleanupNetworkListener, processPendingRequests } from '../utils/apiService';
+import { loadExpenses, saveExpenses, loadCategories, saveCategories } from '../utils/storage';
 
 export default function ExpenseScreen() {
   const { token, logout } = useContext(AuthContext);
@@ -30,6 +33,40 @@ export default function ExpenseScreen() {
   const [activeTab, setActiveTab] = useState('list');
   const [dateFilter, setDateFilter] = useState('all');
 
+   const loadInitialData = async () => {
+    try {
+      // Load expenses from local storage
+      const storedExpenses = await loadExpenses();
+      if (storedExpenses && storedExpenses.length > 0) {
+        setExpenses(storedExpenses);
+      }
+      
+      // Load categories from local storage
+      const storedCategories = await loadCategories();
+      if (storedCategories && storedCategories.length > 0) {
+        setCategories(storedCategories);
+      }
+    } catch (error) {
+      console.error('Error loading initial data from storage:', error);
+    }
+  };
+
+  const saveExpensesToStorage = async (expensesToSave) => {
+    try {
+      await saveExpenses(expensesToSave);
+    } catch (error) {
+      console.error('Error saving expenses to storage:', error);
+    }
+  };
+
+  const saveCategoriesToStorage = async (categoriesToSave) => {
+    try {
+      await saveCategories(categoriesToSave);
+    } catch (error) {
+      console.error('Error saving categories to storage:', error);
+    }
+  };
+
   const fetchExpenses = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
@@ -37,28 +74,47 @@ export default function ExpenseScreen() {
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/expenses`, {
+      const response = await makeApiRequest({
+        endpoint: '/api/expenses',
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-auth-token': token,
-        },
+        token: token,
+        isCritical: false // Non-critical request can be queued when offline
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          Alert.alert('Session expired', 'Please login again.');
-          logout();
+      // Handle queued request (though we wouldn't typically queue GET requests for performance)
+      if (response && response.queued) {
+        // When we get a queued response, we should try to load from local storage
+        const storedExpenses = await loadExpenses();
+        if (storedExpenses && storedExpenses.length > 0) {
+          setExpenses(storedExpenses);
+          if (!isRefresh) {
+            setLoading(false);
+          } else {
+            setRefreshing(false);
+          }
+          Alert.alert('Loaded Offline', 'Showing expenses from local storage. Sync will occur when back online.');
+          return;
+        } else {
+          setError('No expenses available. Please connect to internet to load data.');
+          if (!isRefresh) {
+            setLoading(false);
+          } else {
+            setRefreshing(false);
+          }
           return;
         }
-        throw new Error(data.msg || 'Failed to fetch expenses');
       }
 
-      setExpenses(data);
+      setExpenses(response);
+      // Save to local storage for offline use
+      saveExpensesToStorage(response);
     } catch (err) {
       console.error('Fetch expenses error:', err.message);
+      if (err.message === 'Session expired') {
+        Alert.alert('Session expired', 'Please login again.');
+        logout();
+        return;
+      }
       setError('Could not load expenses. Pull down to retry.');
     } finally {
       setLoading(false);
@@ -66,23 +122,32 @@ export default function ExpenseScreen() {
     }
   };
 
-  const fetchCategories = async () => {
+   const fetchCategories = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/categories`, {
+      const response = await makeApiRequest({
+        endpoint: '/api/categories',
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-auth-token': token,
-        },
+        token: token,
+        isCritical: false // Non-critical request can be queued when offline
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.msg || 'Failed to fetch categories');
+      // Handle queued request (though we wouldn't typically queue GET requests for performance)
+      if (response && response.queued) {
+        // When we get a queued response, we should try to load from local storage
+        const storedCategories = await loadCategories();
+        if (storedCategories && storedCategories.length > 0) {
+          setCategories(storedCategories);
+          Alert.alert('Loaded Offline', 'Showing categories from local storage. Sync will occur when back online.');
+          return;
+        } else {
+          setError('No categories available. Please connect to internet to load data.');
+          return;
+        }
       }
 
-      setCategories(data);
+      setCategories(response);
+      // Save to local storage for offline use
+      saveCategoriesToStorage(response);
     } catch (err) {
       console.error('Fetch categories error:', err.message);
       Alert.alert('Error', 'Could not load categories');
@@ -90,40 +155,74 @@ export default function ExpenseScreen() {
   };
 
   useEffect(() => {
+    // Load data from local storage first for immediate UI
+    loadInitialData();
+    
+    // Set up network listener for processing pending requests
+    setupNetworkListener();
+    
+    // Set up app state listener to process pending requests when app comes to foreground
+    const appStateListener = (state) => {
+      if (state === 'active') {
+        // Process pending requests when app becomes active
+        processPendingRequests();
+      }
+    };
+    
+    const appStateSubscription = AppState.addEventListener('change', appStateListener);
+    
+    // Then try to fetch from API
     fetchExpenses();
     fetchCategories();
+    
+    // Clean up listeners on unmount
+    return () => {
+      cleanupNetworkListener();
+      appStateSubscription.remove();
+    };
   }, []);
 
-  const addCategory = async (name) => {
+   const addCategory = async (name) => {
     if (!name || !name.trim()) {
       Alert.alert('Invalid', 'Category name cannot be empty');
       return;
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/categories`, {
+      const response = await makeApiRequest({
+        endpoint: '/api/categories',
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-auth-token': token,
-        },
-        body: JSON.stringify({ name: name.trim() }),
+        data: { name: name.trim() },
+        token: token,
+        isCritical: false // Non-critical request can be queued when offline
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.msg || 'Failed to add category');
+      // Handle queued request
+      if (response && response.queued) {
+        Alert.alert('Saved Offline', 'Your category has been saved offline and will sync when you are back online.');
+        // Create a temporary category object
+        const tempCategory = {
+          _id: Date.now().toString(), // Temporary ID
+          name: name.trim()
+        };
+        const updatedCategories = [...categories, tempCategory];
+        setCategories(updatedCategories);
+        // Save updated categories to storage
+        saveCategoriesToStorage(updatedCategories);
+        return;
       }
 
-      setCategories((prev) => [...prev, data]);
+      const updatedCategories = [...categories, response];
+      setCategories(updatedCategories);
+      // Save updated categories to storage
+      saveCategoriesToStorage(updatedCategories);
       Alert.alert('Success', `Category "${name}" added!`);
     } catch (err) {
       Alert.alert('Error', err.message || 'Could not add category');
     }
   };
 
-  const saveExpense = async (expenseData) => {
+   const saveExpense = async (expenseData) => {
     console.log('saveExpense called with data:', expenseData);
     console.log('Is edit mode?', !!editingExpense);
 
@@ -137,26 +236,36 @@ export default function ExpenseScreen() {
       setExpenses(optimisticExpenses);
 
       try {
-        const response = await fetch(`${API_BASE_URL}/api/expenses/${id}`, {
+        const response = await makeApiRequest({
+          endpoint: `/api/expenses/${id}`,
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-auth-token': token,
-          },
-          body: JSON.stringify(expenseData),
+          data: expenseData,
+          token: token,
+          isCritical: false // Non-critical request can be queued when offline
         });
 
-        const data = await response.json();
-        console.log('Update response status:', response.status);
-        console.log('Update response data:', data);
-
-        if (!response.ok) {
-          throw new Error(data.msg || 'Failed to update expense');
+        // Handle queued request
+        if (response && response.queued) {
+          Alert.alert('Saved Offline', 'Your changes have been saved offline and will sync when you are back online.');
+          const updatedExpenses = expenses.map((exp) =>
+            exp._id === id ? { ...expenseData, _id: id } : exp
+          );
+          setExpenses(updatedExpenses);
+          saveExpensesToStorage(updatedExpenses);
+          setEditingExpense(null);
+          setModalVisible(false);
+          return;
         }
 
-        setExpenses((prev) =>
-          prev.map((exp) => (exp._id === id ? { ...data } : exp))
+        console.log('Update response status:', response.status);
+        console.log('Update response data:', response);
+
+        const updatedExpenses = expenses.map((exp) =>
+          exp._id === id ? { ...response } : exp
         );
+        setExpenses(updatedExpenses);
+        // Save updated expenses to storage
+        saveExpensesToStorage(updatedExpenses);
       } catch (err) {
         console.error('Update failed:', err.message);
         setExpenses((prev) =>
@@ -179,24 +288,33 @@ export default function ExpenseScreen() {
       setExpenses((prev) => [optimisticExpense, ...prev]);
 
       try {
-        const response = await fetch(`${API_BASE_URL}/api/expenses`, {
+        const response = await makeApiRequest({
+          endpoint: '/api/expenses',
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-auth-token': token,
-          },
-          body: JSON.stringify(expenseData),
+          data: expenseData,
+          token: token,
+          isCritical: false // Non-critical request can be queued when offline
         });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.msg || 'Failed to add');
+        // Handle queued request
+        if (response && response.queued) {
+          Alert.alert('Saved Offline', 'Your expense has been saved offline and will sync when you are back online.');
+          // Assign a temporary ID and save to storage
+          const tempId = Date.now().toString();
+          const expenseWithTempId = { ...expenseData, _id: tempId };
+          const updatedExpenses = [expenseWithTempId, ...expenses.filter((exp) => exp._id !== optimisticId)];
+          setExpenses(updatedExpenses);
+          saveExpensesToStorage(updatedExpenses);
+          setModalVisible(false);
+          return;
         }
 
-        setExpenses((prev) =>
-          prev.map((exp) => (exp._id === optimisticId ? { ...data } : exp))
+        const updatedExpenses = expenses.map((exp) =>
+          exp._id === optimisticId ? { ...response } : exp
         );
+        setExpenses(updatedExpenses);
+        // Save updated expenses to storage
+        saveExpensesToStorage(updatedExpenses);
       } catch (err) {
         console.error('Add failed:', err.message);
         setExpenses((prev) => prev.filter((exp) => exp._id !== optimisticId));
@@ -213,7 +331,7 @@ export default function ExpenseScreen() {
     setModalVisible(true);
   };
 
-  const deleteExpense = async (id) => {
+   const deleteExpense = async (id) => {
     Alert.alert(
       'Delete Expense',
       'Are you sure you want to delete this expense?',
@@ -227,14 +345,23 @@ export default function ExpenseScreen() {
             setExpenses((prev) => prev.filter((exp) => exp._id !== id));
 
             try {
-              const response = await fetch(`${API_BASE_URL}/api/expenses/${id}`, {
+              const response = await makeApiRequest({
+                endpoint: `/api/expenses/${id}`,
                 method: 'DELETE',
-                headers: { 'x-auth-token': token },
+                token: token,
+                isCritical: false // Non-critical request can be queued when offline
               });
 
-              if (!response.ok) {
-                throw new Error('Delete failed');
+              // Handle queued request
+              if (response && response.queued) {
+                Alert.alert('Deleted Offline', 'Your expense has been marked for deletion and will be removed when you are back online.');
+                // Save updated expenses to storage (without the deleted item)
+                saveExpensesToStorage(prevExpenses.filter((exp) => exp._id !== id));
+                return;
               }
+              
+              // Save updated expenses to storage after successful deletion
+              saveExpensesToStorage(prevExpenses.filter((exp) => exp._id !== id));
             } catch (err) {
               console.error('Delete error:', err);
               setExpenses(prevExpenses);
